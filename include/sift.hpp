@@ -26,6 +26,7 @@
 using namespace cv;
 using namespace cv::xfeatures2d;
 
+
 typedef float data_t; // data type using in filter
 
  /*SIFT build-in opencv function*/
