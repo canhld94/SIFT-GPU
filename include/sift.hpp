@@ -17,12 +17,16 @@
 #include <opencv2/core.hpp>
 #include <opencv2/xfeatures2d.hpp>
 #include <opencv2/highgui.hpp>
+#include <opencv2/core/utility.hpp>
+#include <opencv2/core/hal/hal.hpp>
 #include <iostream>
 #include <sys/time.h>
 #include <omp.h>
 
 using namespace cv;
 using namespace cv::xfeatures2d;
+
+typedef float data_t; // data type using in filter
 
  /*SIFT build-in opencv function*/
 void SITF_BuildIn_OpenCV(InputArray image,
