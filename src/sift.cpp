@@ -51,7 +51,7 @@ static const int SIFT_FIXPT_SCALE = 1;
 void SITF_BuildIn_OpenCV(InputArray image,
 						 std::vector<KeyPoint>& keypoints,
 						 OutputArray descriptors){
-	Ptr<SIFT> detector = SIFT::create(0,2,0.04,15,2);
+	Ptr<SIFT> detector = SIFT::create();
 	Mat tmp;
 	detector->detectAndCompute(image, tmp, keypoints, descriptors, 0);
 	detector->clear();
@@ -85,7 +85,7 @@ void SIFT_NCL(InputArray image,
 	int dsize = SIFT_DESCR_WIDTH*SIFT_DESCR_WIDTH*SIFT_DESCR_HIST_BINS;
 	descriptors.create((int)keypoints.size(), dsize, CV_32F);
 	Mat _descriptors = descriptors.getMat();
-	calDescriptor(gpyr, keypoints, _descriptors, -1);
+	calDescriptor(gpyr, keypoints, _descriptors, 0);
 	t = (double) getTickCount() - t;
 	printf("descriptor extraction time: %g\n", t*1000./tf);
 
@@ -222,8 +222,8 @@ static Mat createInitialImage(Mat& image,
 							  bool doubleSize,
 					   		  double sigma){
 	Mat base;
-	// Gaussian_Blur_1D(image, base, sigma);
-	GaussianBlur(image, base, Size(), sigma, sigma);
+	Gaussian_Blur_1D(image, base, sigma);
+	// GaussianBlur(image, base, Size(), sigma, sigma);
 
 	return base;
 }
@@ -255,8 +255,8 @@ void buildGaussianPyramid(Mat& image,
 			}
 			else{
 				Mat& src = gpyr[o*nScales]; // Base of current octave
-				// Gaussian_Blur_1D(src, dst, sig[i]);
-				GaussianBlur(src, dst, Size(), sig[i], sig[i]);
+				Gaussian_Blur_1D(src, dst, sig[i]);
+				// GaussianBlur(src, dst, Size(), sig[i], sig[i]);
 			}
 	}
 	}
@@ -621,7 +621,7 @@ void findScaleSpaceExtrema(std::vector<Mat>& gpyr,
             const int step = (int)img.step1();
             const int rows = img.rows, cols = img.cols;
 			findScaleSpaceExtremaComputer(
-                    o, i, 7, idx, step,
+                    o, i, 6, idx, step,
                     nOctaveLayers,
                     contrastThreshold,
                     edgeThreshold,
