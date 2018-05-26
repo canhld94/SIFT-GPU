@@ -25,7 +25,7 @@ DEPS = $(OBJECTS:.o=.d)
 COMPILE_FLAGS = -std=c++11 -Wall -O3 -fopenmp
 INCLUDES = -I include/ -I /usr/local/include -I /usr/local/cuda-9.1/include/
 # Space-separated pkg-config libraries used by this project
-LIBS = -lopencv_imgproc -lopencv_xfeatures2d -lopencv_core -lopencv_highgui -gomp -fopenmp
+LIBS = -lopencv_imgproc -lopencv_xfeatures2d -lopencv_core -lopencv_highgui -lopencv_calib3d -lopencv_flann -gomp -fopenmp
 EXTRA_LIBS = -Xlinker /usr/local/lib/libopencv_imgcodecs.so.4.0 -Xlinker /usr/local/lib/libopencv_features2d.so.4.0
 
 .PHONY: default_target

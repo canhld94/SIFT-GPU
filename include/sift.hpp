@@ -19,13 +19,14 @@
 #include <opencv2/highgui.hpp>
 #include <opencv2/core/utility.hpp>
 #include <opencv2/core/hal/hal.hpp>
+#include <opencv2/calib3d/calib3d.hpp>
+#include <opencv2/core/types_c.h>
 #include <iostream>
 #include <sys/time.h>
 #include <omp.h>
 
 using namespace cv;
 using namespace cv::xfeatures2d;
-
 
 typedef float data_t; // data type using in filter
 
@@ -35,7 +36,7 @@ void SITF_BuildIn_OpenCV(InputArray image,
 						 OutputArray descriptors);
 
  /*NCL SIFT, based opencv source code*/
-void SIFT_NCL(Mat& image,
+void SIFT_NCL(InputArray image,
 		  std::vector<KeyPoint> & keypoints,
 		  OutputArray descriptors);
 
@@ -57,6 +58,11 @@ void findScaleSpaceExtrema(std::vector<Mat>& gpyr,
 						   std::vector<Mat>& dogpyr,
 						   std::vector<KeyPoint>& keypoints,
 						   int nOctaves);
+
+void calDescriptor( std::vector<Mat>& gpyr,
+					std::vector<KeyPoint>& keypoints,
+					Mat& descriptors,
+					int firstOctave);
 
 
 #endif /* SIFT_HPP_ */
