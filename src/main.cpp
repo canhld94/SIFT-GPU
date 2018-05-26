@@ -37,7 +37,7 @@ int main( int argc, char** argv )
             
         if(m1.distance <= 0.88* m2.distance)        
         good_matches.push_back(m1);     
-}
+  }
     Mat img_matches;
     drawMatches(img1, keypoints1, img0, keypoints0, good_matches, img_matches, Scalar(0, 0, 255), Scalar::all(-1),std::vector<char>(), DrawMatchesFlags::NOT_DRAW_SINGLE_POINTS);
     
