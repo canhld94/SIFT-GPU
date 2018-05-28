@@ -22,7 +22,7 @@ int main( int argc, char** argv )
     // SITF_BuildIn_OpenCV(gray1, keypoints1, descriptors1);
     SIFT_NCL(gray0, keypoints0, descriptors0);
     SIFT_NCL(gray1, keypoints1, descriptors1);
-    BFMatcher matcher(NORM_L1);
+    BFMatcher matcher(NORM_L2);
     std::vector<std::vector<DMatch> > matches;
     matcher.knnMatch(descriptors1, descriptors0, matches, 2);
     std::vector<DMatch> good_matches;
@@ -35,7 +35,7 @@ int main( int argc, char** argv )
         const DMatch &m1 = matches[i][0];
         const DMatch &m2 = matches[i][1];
             
-        if(m1.distance <= 0.9* m2.distance)        
+        if(m1.distance <= 0.95* m2.distance)        
         good_matches.push_back(m1);     
   }
     Mat img_matches;
@@ -73,7 +73,7 @@ int main( int argc, char** argv )
 
   /** @function readme */
   void readme(){
-	  std::cout<< "Usage: ./SIFT_detector <img1>" << std::endl;
+	  std::cout<< "Usage: ./sift <scene> <object> " << std::endl;
   }
   
   void readImage(Mat& img, Mat& gray, char* filename, bool resized){

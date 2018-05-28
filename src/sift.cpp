@@ -237,11 +237,13 @@ void buildGaussianPyramid(Mat& image,
 
 	// create base image for first octave
 	Mat base = createInitialImage(image, 0, sqrt(Sigma*Sigma + 0.5*0.5));
+    //  Mat base = createInitialImage(image, 0, sqrt(0.5*0.5));
 	// pre-compute sigma for each scale
 	sig[0] = Sigma;
 	for(int i = 1; i < nScales; ++i){
 		double sig_total = pow(k* 1.0, (double) i)*Sigma;
 		sig[i] = (float) sqrt(sig_total*sig_total - Sigma*Sigma);
+        // sig[i] = sig[i-1]*k;
 	}
 	for (int o = 0; o < nOctaves; ++o) {
 		for (int i = 0; i < nScales; ++i) {
@@ -612,7 +614,6 @@ void findScaleSpaceExtrema(std::vector<Mat>& gpyr,
 	// const float threshold = 0.5 * contrastThreshold / nOctaveLayers;
     keypoints.clear();
     TLSData<std::vector<KeyPoint> > tls_kpts_struct;
-
     for( int o = 0; o < nOctaves; o++ )
         for( int i = 1; i <= nOctaveLayers; i++ )
         {
@@ -621,7 +622,7 @@ void findScaleSpaceExtrema(std::vector<Mat>& gpyr,
             const int step = (int)img.step1();
             const int rows = img.rows, cols = img.cols;
 			findScaleSpaceExtremaComputer(
-                    o, i, 6, idx, step,
+                    o, i, 8, idx, step,
                     nOctaveLayers,
                     contrastThreshold,
                     edgeThreshold,
@@ -947,6 +948,7 @@ void calDescriptor( std::vector<Mat>& gpyr,
 					Mat& descriptors,
 					int firstOctave){
 	static const int d = SIFT_DESCR_WIDTH, n = SIFT_DESCR_HIST_BINS;
+    #pragma omp parallel for
 	for(int i = 0; i < keypoints.size(); ++i){
 		KeyPoint kpt = keypoints[i];
 		int octave, layer;
