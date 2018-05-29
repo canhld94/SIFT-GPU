@@ -1,4 +1,5 @@
 #include "sift.hpp"
+#include "sift_cuda.hpp"
 
 using namespace cv;
 using namespace cv::xfeatures2d;
@@ -9,7 +10,7 @@ void readImage(Mat&, Mat&, char*, bool);
 /** @function main */
 int main( int argc, char** argv )
 {
-    if( argc != 3 )
+    if( argc != 4 )
       { readme(); return -1; }
 
     Mat img0, img1; // image
@@ -20,8 +21,14 @@ int main( int argc, char** argv )
     readImage(img1, gray1, argv[2], 0);
     // SITF_BuildIn_OpenCV(gray0, keypoints0, descriptors0);
     // SITF_BuildIn_OpenCV(gray1, keypoints1, descriptors1);
-    SIFT_NCL(gray0, keypoints0, descriptors0);
-    SIFT_NCL(gray1, keypoints1, descriptors1);
+    int mode_gpu = atoi(argv[3]);
+    if(mode_gpu){
+      SIFT_NCL_GPU(gray0, keypoints0, descriptors0);
+      SIFT_NCL_GPU(gray1, keypoints1, descriptors1);
+    }else{
+      SIFT_NCL(gray0, keypoints0, descriptors0);
+      SIFT_NCL(gray1, keypoints1, descriptors1);
+    }
     BFMatcher matcher(NORM_L2);
     std::vector<std::vector<DMatch> > matches;
     matcher.knnMatch(descriptors1, descriptors0, matches, 2);
@@ -66,14 +73,14 @@ int main( int argc, char** argv )
   line( img_matches, scene_corners[1] + Point2f( img1.cols, 0), scene_corners[2] + Point2f( img1.cols, 0), Scalar( 0, 255, 0), 4 );
   line( img_matches, scene_corners[2] + Point2f( img1.cols, 0), scene_corners[3] + Point2f( img1.cols, 0), Scalar( 0, 255, 0), 4 );
   line( img_matches, scene_corners[3] + Point2f( img1.cols, 0), scene_corners[0] + Point2f( img1.cols, 0), Scalar( 0, 255, 0), 4 );
-    imshow("Keypoints", img_matches);
-    waitKey(0);
+    //imshow("Keypoints", img_matches);
+    //waitKey(0);
     return 0;
 }
 
   /** @function readme */
   void readme(){
-	  std::cout<< "Usage: ./sift <scene> <object> " << std::endl;
+	  std::cout<< "Usage: ./sift <scene> <object> <use_gpu:0/1> " << std::endl;
   }
   
   void readImage(Mat& img, Mat& gray, char* filename, bool resized){
