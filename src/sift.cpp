@@ -46,8 +46,6 @@ static const float SIFT_INT_DESCR_FCTR = 512.f;
 
 static const int SIFT_FIXPT_SCALE = 1;
 
-
-
 void SITF_BuildIn_OpenCV(InputArray image,
 						 std::vector<KeyPoint>& keypoints,
 						 OutputArray descriptors){
@@ -236,7 +234,7 @@ void buildGaussianPyramid(Mat& image,
 	double k = pow(2.0, 1.0/nOctaveLayers);
 
 	// create base image for first octave
-	Mat base = createInitialImage(image, 0, sqrt(Sigma*Sigma + 0.5*0.5));
+	Mat base = createInitialImage(image, 0, sqrt(Sigma*Sigma+0.2*0.2));
     //  Mat base = createInitialImage(image, 0, sqrt(0.5*0.5));
 	// pre-compute sigma for each scale
 	sig[0] = Sigma;
@@ -561,7 +559,7 @@ void findScaleSpaceExtrema(std::vector<Mat>& gpyr,
             const int step = (int)img.step1();
             const int rows = img.rows, cols = img.cols;
 			findScaleSpaceExtremaComputer(
-                    o, i, 8, idx, step,
+                    o, i, 4, idx, step,
                     nOctaveLayers,
                     contrastThreshold,
                     edgeThreshold,
@@ -695,10 +693,29 @@ static void calcSIFTDescriptor( const Mat& img, Point2f ptf, float ori, float sc
     float thr = std::sqrt(nrm2)*SIFT_DESCR_MAG_THR;
 
     i = 0, nrm2 = 0;
+    for( ; i < len; i++ )
+    {
+        float val = std::min(dst[i], thr);
+        dst[i] = val;
+        nrm2 += val*val;
+    }
+    nrm2 = SIFT_INT_DESCR_FCTR/std::max(std::sqrt(nrm2), FLT_EPSILON);
     k = 0;
+
     for( ; k < len; k++ )
     {
         dst[k] = saturate_cast<uchar>(dst[k]*nrm2);
+    }
+    float nrm1 = 0;
+    for( k = 0; k < len; k++ )
+    {
+        dst[k] *= nrm2;
+        nrm1 += dst[k];
+    }
+    nrm1 = 1.f/std::max(nrm1, FLT_EPSILON);
+    for( k = 0; k < len; k++ )
+    {
+        dst[k] = std::sqrt(dst[k] * nrm1);//saturate_cast<uchar>(std::sqrt(dst[k] * nrm1)*SIFT_INT_DESCR_FCTR);
     }
 }
 
