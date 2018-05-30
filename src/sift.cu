@@ -2,34 +2,100 @@
 #include "sift_cuda.hpp"
 #include "cuda_helper.h"
 
-#define MIN(a,b) (((a)<(b))?(a):(b))
 #define MAX_THREADS_PER_BLOCK 1024
 
-__global__ void gaussianBlurRow(float* input, float* output, float* filter, int rows, int cols, int filter_size){
-    int tid_row = blockIdx.x * blockDim.x + threadIdx.x;
-    int tid_col = blockIdx.y * blockDim.y + threadIdx.y;
-    int tid = tid_row * cols + tid_col;
-    if(tid_row >= rows || tid_col >= cols)
+__global__ void gaussianBlurRow(float* input_g, float* output, float* filter, int rows, int cols, int filter_size){
+    extern __shared__ float shared_ptr[];
+    float* filter_s = shared_ptr;
+    float* input_s = (float*)&shared_ptr[filter_size];
+
+    int half_size = filter_size/2;
+    int row_idx = blockIdx.x;
+    int col_idx = blockIdx.y * blockDim.x + threadIdx.x;
+    int input_idx = row_idx * cols + col_idx;
+
+    // Filter to shared memory
+    if(threadIdx.x < filter_size){
+        filter_s[threadIdx.x] = filter[threadIdx.x];
+    }
+    if(blockDim.x < filter_size && threadIdx.x == 0){
+        for(int j = blockDim.x ; j < filter_size ; j++){
+            filter_s[j] = filter[j];
+        }
+    }
+
+    // Input image to shared memory
+    int row_offset = row_idx * cols - half_size;
+    if(threadIdx.x < cols + half_size*2){
+        if(threadIdx.x < half_size || threadIdx.x >= cols + half_size){
+            input_s[threadIdx.x] = 0;
+        }else{
+            input_s[threadIdx.x] = input_g[row_offset + threadIdx.x];
+        }
+    }
+    if(blockDim.x < cols + half_size*2 && threadIdx.x == 0){
+        for(int j = blockDim.x ; j < cols + half_size*2 ; j++){
+            if(j < half_size || j >= cols + half_size){
+                input_s[j] = 0;
+            }else{
+                input_s[j] = input_g[row_offset + j];
+            }
+        }
+    }
+    __syncthreads();
+    if(col_idx >= cols)
         return;
     float tmp = 0;
-    int half_size = filter_size/2;
     for(int i = -half_size ; i < half_size ; i++){
-        tmp += (tid_col + i < 0 || tid_col + i >= cols - 1 ) ? 0 : input[tid + i] * filter[i + half_size];
+        tmp += input_s[col_idx + i + half_size] * filter_s[i + half_size];
     }
-    output[tid] = tmp;
+    output[input_idx] = tmp;
 }
-__global__ void gaussianBlurCol(float* input, float* output, float* filter, int rows, int cols, int filter_size){
-    int tid_row = blockIdx.x * blockDim.x + threadIdx.x;
-    int tid_col = blockIdx.y * blockDim.y + threadIdx.y;
-    int tid = tid_row * cols + tid_col;
-    if(tid_row >= rows || tid_col >= cols)
+__global__ void gaussianBlurCol(float* input_g, float* output, float* filter, int rows, int cols, int filter_size){
+    extern __shared__ float shared_ptr[];
+    float* filter_s = shared_ptr;
+    float* input_s = (float*)&shared_ptr[filter_size];
+
+    int half_size = filter_size/2;
+    int row_idx = blockIdx.y * blockDim.x + threadIdx.x;
+    int col_idx = blockIdx.x;
+    int input_idx = row_idx * cols + col_idx;
+
+    // Filter to shared memory
+    if(threadIdx.x < filter_size){
+        filter_s[threadIdx.x] = filter[threadIdx.x];
+    }
+    if(blockDim.x < filter_size && threadIdx.x == 0){
+        for(int j = blockDim.x ; j < filter_size ; j++){
+            filter_s[j] = filter[j];
+        }
+    }
+
+    // Input image to shared memory
+    if(threadIdx.x < rows + half_size*2){
+        if(threadIdx.x < half_size || threadIdx.x >= rows + half_size){
+            input_s[threadIdx.x] = 0;
+        }else{
+            input_s[threadIdx.x] = input_g[(threadIdx.x - half_size)*cols + col_idx];
+        }
+    }
+    if(blockDim.x < rows + half_size*2 && threadIdx.x == 0){
+        for(int j = blockDim.x ; j < rows + half_size*2 ; j++){
+            if(j < half_size || j >= rows + half_size){
+                input_s[j] = 0;
+            }else{
+                input_s[j] = input_g[(j - half_size)*cols + col_idx];
+            }
+        }
+    }
+    __syncthreads();
+    if(row_idx >= rows)
         return;
     float tmp = 0;
-    int half_size = filter_size/2;
     for(int i = -half_size ; i < half_size ; i++){
-        tmp += (tid_row + i < 0 || tid_row + i >= rows - 1 ) ? 0 : input[ (tid_row + i) * cols + tid_col ] * filter[i + half_size];
+        tmp += input_s[row_idx + i + half_size] * filter_s[i + half_size];
     }
-    output[tid] = tmp;
+    output[input_idx] = tmp;
 }
 
 __global__ void gaussianFilter1D(float* kernel_data,float sigma,int w){
@@ -42,7 +108,6 @@ __global__ void halfImage(float* input, float* output, int rows, int cols){
     int tid_row = blockIdx.x * blockDim.x + threadIdx.x;
     int tid_col = blockIdx.y * blockDim.y + threadIdx.y;
 
-    int dst_rows = rows/2;
     int dst_cols = cols/2;
 
     if( tid_col * 2 > cols || tid_row * 2 > rows)
@@ -73,15 +138,15 @@ extern "C" void gaussianBlur1DGPU(float* src, float* dst, float* filter, int row
 
     CHECK(cudaMalloc((float**)&itm_data, rows*cols * sizeof(float)));
 
-    dim3 gridRow(rows/32 + (rows%32?1:0),cols/32 + (cols%32?1:0));
-    dim3 blockRow(MIN(rows,32),MIN(cols,32));
-    gaussianBlurRow<<<gridRow,blockRow>>>(src,itm_data,filter,rows,cols,filter_size);
+    dim3 gridRow(rows,cols/MAX_THREADS_PER_BLOCK + (cols%MAX_THREADS_PER_BLOCK?1:0));
+    dim3 blockRow(MIN(cols,MAX_THREADS_PER_BLOCK));
+    gaussianBlurRow<<<gridRow,blockRow,( filter_size + (cols + (filter_size/2)*2) )*sizeof(float)>>>(src,itm_data,filter,rows,cols,filter_size);
     CHECK(cudaGetLastError());
     CHECK(cudaDeviceSynchronize());
 
-    dim3 gridCol(rows/32 + (rows%32?1:0),cols/32 + (cols%32?1:0));
-    dim3 blockCol(MIN(rows,32),MIN(cols,32));
-    gaussianBlurCol<<<gridCol,blockCol>>>(itm_data,dst,filter,rows,cols,filter_size);
+    dim3 gridCol(cols,rows/MAX_THREADS_PER_BLOCK + (rows%MAX_THREADS_PER_BLOCK?1:0));
+    dim3 blockCol(MIN(rows,MAX_THREADS_PER_BLOCK));
+    gaussianBlurCol<<<gridCol,blockCol,( filter_size + (rows + (filter_size/2)*2) )*sizeof(float)>>>(itm_data,dst,filter,rows,cols,filter_size);
     CHECK(cudaGetLastError());
     CHECK(cudaDeviceSynchronize());
     CHECK(cudaFree(itm_data));
@@ -110,6 +175,9 @@ extern "C" void SIFT_NCL_GPU(InputArray image,
     OutputArray descriptors){
         std::vector<Mat> dogpyr(nOctaves*(nScales - 1));
         std::vector<Mat> gpyr(nOctaves*nScales);
+        float* dummy;
+        CHECK(cudaMalloc((float**)&dummy,1*sizeof(float)));
+        CHECK(cudaFree(dummy));
         double t, tf;
         tf = getTickFrequency();
         t = (double) getTickCount();
@@ -128,6 +196,12 @@ extern "C" void SIFT_NCL_GPU(InputArray image,
         prepareForCPU(gpyr_arr, dogpyr_arr, gpyr, dogpyr, rows, cols);
         t = (double) getTickCount() - t;
         printf("pyramid construction time: %g\n", t*1000./tf);
+        //char s[100];
+	    //for (int i = 0; i < gpyr.size(); ++i) {
+	    //    sprintf(s, "DoGaussian %d.png", i);
+	    //    normalize(gpyr[i], gpyr[i], 0, 1, NORM_MINMAX);
+	    //    imwrite(s, gpyr[i]);
+	    //}
         t = (double) getTickCount();
         findScaleSpaceExtrema(gpyr,dogpyr,keypoints, 5);
         t = (double) getTickCount() - t;
@@ -205,6 +279,7 @@ extern "C" void prepareForCPU(float** gpyr_d, float** dogpyr_d, std::vector<Mat>
             CHECK(cudaMemcpy(dogpyr_h,dogpyr_d[id], rows[i] * cols[i] * sizeof(float),cudaMemcpyDeviceToHost));
         }
     }
+    CHECK(cudaDeviceReset());
 }
 
 extern "C" void buildGaussianPyramidGPU(int octave_idx, Mat image, float** filter, float** gpyr, std::vector<int>& rows, std::vector<int>& cols, std::vector<int>& filter_sizes){

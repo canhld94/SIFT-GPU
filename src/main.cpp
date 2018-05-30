@@ -73,8 +73,8 @@ int main( int argc, char** argv )
   line( img_matches, scene_corners[1] + Point2f( img1.cols, 0), scene_corners[2] + Point2f( img1.cols, 0), Scalar( 0, 255, 0), 4 );
   line( img_matches, scene_corners[2] + Point2f( img1.cols, 0), scene_corners[3] + Point2f( img1.cols, 0), Scalar( 0, 255, 0), 4 );
   line( img_matches, scene_corners[3] + Point2f( img1.cols, 0), scene_corners[0] + Point2f( img1.cols, 0), Scalar( 0, 255, 0), 4 );
-    //imshow("Keypoints", img_matches);
-    //waitKey(0);
+    imshow("Keypoints", img_matches);
+    waitKey(0);
     return 0;
 }
 
