@@ -206,7 +206,6 @@ extern "C" void SIFT_NCL_GPU(InputArray image,
         findScaleSpaceExtrema(gpyr,dogpyr,keypoints, 5);
         t = (double) getTickCount() - t;
         printf("keypoint localization time: %g\n", t*1000./tf);
-
         t = (double) getTickCount();
         int dsize = SIFT_DESCR_WIDTH*SIFT_DESCR_WIDTH*SIFT_DESCR_HIST_BINS;
         descriptors.create((int)keypoints.size(), dsize, CV_32F);
@@ -214,7 +213,7 @@ extern "C" void SIFT_NCL_GPU(InputArray image,
         calDescriptor(gpyr, keypoints, _descriptors, 0);
         t = (double) getTickCount() - t;
         printf("descriptor extraction time: %g\n", t*1000./tf);
-
+        CHECK(cudaDeviceReset());
         return;
 }
 
@@ -279,7 +278,6 @@ extern "C" void prepareForCPU(float** gpyr_d, float** dogpyr_d, std::vector<Mat>
             CHECK(cudaMemcpy(dogpyr_h,dogpyr_d[id], rows[i] * cols[i] * sizeof(float),cudaMemcpyDeviceToHost));
         }
     }
-    CHECK(cudaDeviceReset());
 }
 
 extern "C" void buildGaussianPyramidGPU(int octave_idx, Mat image, float** filter, float** gpyr, std::vector<int>& rows, std::vector<int>& cols, std::vector<int>& filter_sizes){
