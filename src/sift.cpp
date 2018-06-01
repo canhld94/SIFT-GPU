@@ -1,5 +1,5 @@
 #include "sift.hpp"
-
+/*
 void SITF_BuildIn_OpenCV(InputArray image,
 						 std::vector<KeyPoint>& keypoints,
 						 OutputArray descriptors){
@@ -8,7 +8,7 @@ void SITF_BuildIn_OpenCV(InputArray image,
 	detector->detectAndCompute(image, tmp, keypoints, descriptors, 0);
 	detector->clear();
 	return;
-}
+}*/
 
 void SIFT_NCL(InputArray image,
 		  std::vector<KeyPoint> & keypoints,

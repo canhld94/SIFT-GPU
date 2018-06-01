@@ -133,41 +133,46 @@ extern "C" void getGaussianKernel1DGPU(float sigma, float* d_kernel_data, int w)
     CHECK(cudaDeviceSynchronize());
 }
 
-extern "C" void gaussianBlur1DGPU(float* src, float* dst, float* filter, int rows, int cols, int filter_size) {
-    float *itm_data;
-
-    CHECK(cudaMalloc((float**)&itm_data, rows*cols * sizeof(float)));
+extern "C" void gaussianBlur1DGPU(int octave_idx, int scale_idx, float* src, float* dst, float* dst_h, float* filter, float* itm_data, int rows, int cols, int filter_size, cudaStream_t stream) {
+    //CHECK(cudaMalloc((float**)&itm_data, rows*cols * sizeof(float)));
 
     dim3 gridRow(rows,cols/MAX_THREADS_PER_BLOCK + (cols%MAX_THREADS_PER_BLOCK?1:0));
     dim3 blockRow(MIN(cols,MAX_THREADS_PER_BLOCK));
-    gaussianBlurRow<<<gridRow,blockRow,( filter_size + (cols + (filter_size/2)*2) )*sizeof(float)>>>(src,itm_data,filter,rows,cols,filter_size);
+    gaussianBlurRow<<<gridRow,blockRow,( filter_size + (cols + (filter_size/2)*2) )*sizeof(float),stream>>>(src,itm_data,filter,rows,cols,filter_size);
     CHECK(cudaGetLastError());
-    CHECK(cudaDeviceSynchronize());
+    //CHECK(cudaDeviceSynchronize());
+    CHECK(cudaStreamSynchronize(stream));
 
     dim3 gridCol(cols,rows/MAX_THREADS_PER_BLOCK + (rows%MAX_THREADS_PER_BLOCK?1:0));
     dim3 blockCol(MIN(rows,MAX_THREADS_PER_BLOCK));
-    gaussianBlurCol<<<gridCol,blockCol,( filter_size + (rows + (filter_size/2)*2) )*sizeof(float)>>>(itm_data,dst,filter,rows,cols,filter_size);
+    gaussianBlurCol<<<gridCol,blockCol,( filter_size + (rows + (filter_size/2)*2) )*sizeof(float),stream>>>(itm_data,dst,filter,rows,cols,filter_size);
     CHECK(cudaGetLastError());
-    CHECK(cudaDeviceSynchronize());
-    CHECK(cudaFree(itm_data));
+    //CHECK(cudaDeviceSynchronize());
+    //CHECK(cudaFree(itm_data));
+    CHECK(cudaStreamSynchronize(stream));
+    CHECK(cudaMemcpyAsync(dst_h,dst, rows * cols * sizeof(float),cudaMemcpyDeviceToHost,stream));
 }
 
-extern "C" void halfImageGPU(float* src, float* dst, int rows_ori, int cols_ori){
+extern "C" void halfImageGPU(float* src, float* dst, float* dst_h, int rows_ori, int cols_ori, cudaStream_t stream){
     int rows = rows_ori / 2;
     int cols = cols_ori / 2;
     dim3 grid(rows/32 + (rows%32?1:0),cols/32 + (cols%32?1:0));
     dim3 block(MIN(rows,32),MIN(cols,32));
-    halfImage<<<grid,block>>>(src,dst,rows_ori,cols_ori);
+    halfImage<<<grid,block,0,stream>>>(src,dst,rows_ori,cols_ori);
     CHECK(cudaGetLastError());
-    CHECK(cudaDeviceSynchronize());
+    //CHECK(cudaDeviceSynchronize());
+    CHECK(cudaStreamSynchronize(stream));
+    CHECK(cudaMemcpyAsync(dst_h,dst, rows * cols * sizeof(float),cudaMemcpyDeviceToHost,stream));
 }
 
-extern "C" void differentiateGPU(float* src1, float* src2, float* dst, int rows, int cols){
+extern "C" void differentiateGPU(float* src1, float* src2, float* dst, float* dst_h, int rows, int cols, cudaStream_t stream){
     dim3 grid(rows/32 + (rows%32?1:0),cols/32 + (cols%32?1:0));
     dim3 block(MIN(rows,32),MIN(cols,32));
-    differentiate<<<grid,block>>>(src1, src2, dst, rows, cols);
+    differentiate<<<grid,block,0,stream>>>(src1, src2, dst, rows, cols);
     CHECK(cudaGetLastError());
-    CHECK(cudaDeviceSynchronize());
+    //CHECK(cudaDeviceSynchronize());
+    CHECK(cudaStreamSynchronize(stream));
+    CHECK(cudaMemcpyAsync(dst_h,dst, rows * cols * sizeof(float),cudaMemcpyDeviceToHost,stream));
 }
 
 extern "C" void SIFT_NCL_GPU(InputArray image,
@@ -181,25 +186,29 @@ extern "C" void SIFT_NCL_GPU(InputArray image,
         double t, tf;
         tf = getTickFrequency();
         t = (double) getTickCount();
+        float** h_gpyr_arr = new float*[nOctaves*nScales];
+        float** h_dogpyr_arr = new float*[nOctaves*(nScales-1)];
         float** gpyr_arr = new float*[nOctaves*nScales];
         float** dogpyr_arr = new float*[nOctaves*(nScales-1)];
         float** filter_arr = new float*[nScales];
+        float** itm_arr = new float*[nScales];
         std::vector<int> filter_sizes(nScales);
         std::vector<int> rows(nOctaves);
         std::vector<int> cols(nOctaves);
+        std::vector<cudaStream_t> streams(nScales);
         Mat img = image.getMat();
-        prepareForGPU(img, filter_arr, gpyr_arr, dogpyr_arr, rows, cols, filter_sizes);
+        prepareForGPU(img, filter_arr, gpyr_arr, h_gpyr_arr, gpyr, dogpyr_arr, h_dogpyr_arr, dogpyr, itm_arr, rows, cols, filter_sizes, streams);
         for(int i = 0 ; i < nOctaves ; i++){
-            buildGaussianPyramidGPU(i, img, filter_arr, gpyr_arr, rows, cols, filter_sizes);
-            buildDoGPyramidGPU(i, gpyr_arr, dogpyr_arr, rows, cols);
+            buildGaussianPyramidGPU(i, img, filter_arr, gpyr_arr, gpyr, itm_arr, rows, cols, filter_sizes,streams);
+            buildDoGPyramidGPU(i, gpyr_arr, dogpyr_arr, dogpyr, rows, cols,streams);
         }
-        prepareForCPU(gpyr_arr, dogpyr_arr, gpyr, dogpyr, rows, cols);
+        prepareForCPU(gpyr_arr, dogpyr_arr, gpyr, dogpyr, itm_arr, rows, cols, streams);
         t = (double) getTickCount() - t;
         printf("pyramid construction time: %g\n", t*1000./tf);
         //char s[100];
 	    //for (int i = 0; i < gpyr.size(); ++i) {
 	    //    sprintf(s, "DoGaussian %d.png", i);
-	    //    normalize(gpyr[i], gpyr[i], 0, 1, NORM_MINMAX);
+	    //    normalize(gpyr[i], gpyr[i], 0, 255, NORM_MINMAX);
 	    //    imwrite(s, gpyr[i]);
 	    //}
         t = (double) getTickCount();
@@ -217,7 +226,7 @@ extern "C" void SIFT_NCL_GPU(InputArray image,
         return;
 }
 
-extern "C" void prepareForGPU(Mat img_mat, float** filter, float** gpyr, float** dogpyr, std::vector<int>& rows, std::vector<int>& cols, std::vector<int>& filter_sizes){
+extern "C" void prepareForGPU(Mat img_mat, float** filter, float** gpyr, float** h_gpyr,std::vector<Mat>& gpyr_mat, float** dogpyr, float** h_dogpyr, std::vector<Mat>& dogpyr_mat, float** itm_data, std::vector<int>& rows, std::vector<int>& cols, std::vector<int>& filter_sizes, std::vector<cudaStream_t>& streams){
 	std::vector<float> sig(nScales);
     float *img_arr = (float *) img_mat.data;
     int row_ori = img_mat.rows;
@@ -229,14 +238,20 @@ extern "C" void prepareForGPU(Mat img_mat, float** filter, float** gpyr, float**
         cols[i] = col_ori;
         row_ori = floor(row_ori/2);
         col_ori = floor(col_ori/2);
+        
         for(int j = 0 ; j < nScales ; j++){
             CHECK(cudaMalloc((float**)&(gpyr[i*nScales + j]), rows[i] * cols[i] * sizeof(float) ));
+            CHECK(cudaMallocHost((float**)&(h_gpyr[i*nScales + j]), rows[i] * cols[i] * sizeof(float)));
+            gpyr_mat[i*nScales + j] = cv::Mat(rows[i], cols[i], CV_32F, h_gpyr[i*nScales + j], cols[i]*sizeof(float));
         }
         for(int j = 0 ; j < nScales - 1 ; j++){
             CHECK(cudaMalloc((float**)&(dogpyr[i*(nScales - 1) + j]), rows[i] * cols[i] * sizeof(float) ));
+            CHECK(cudaMallocHost((float**)&(h_dogpyr[i*(nScales-1) + j]), rows[i] * cols[i] * sizeof(float)));
+            dogpyr_mat[i*(nScales-1) + j] = cv::Mat(rows[i], cols[i], CV_32F, h_dogpyr[i*(nScales-1) + j],cols[i]*sizeof(float));
         }
     }
 	for(int i = 0; i < nScales; i++){
+        cudaStreamCreate(&(streams[i]));
         if(i == 0){
             sig[i] = Sigma;
         }else{
@@ -248,6 +263,7 @@ extern "C" void prepareForGPU(Mat img_mat, float** filter, float** gpyr, float**
         int size = 2 * w + 1;
         filter_sizes[i] = size;
 
+        CHECK(cudaMalloc((float**)&itm_data[i],rows[0]*cols[0]*sizeof(float)));
         CHECK(cudaMalloc((float**)&filter[i], size * sizeof(float)));
         getGaussianKernel1DGPU(sig[i],filter[i],w);
 	}
@@ -260,38 +276,25 @@ extern "C" void prepareForGPU(Mat img_mat, float** filter, float** gpyr, float**
 
     CHECK(cudaMalloc((float**)&init_kernel, init_ksize * sizeof(float)));
     getGaussianKernel1DGPU(init_sigma, init_kernel, init_w);
-    gaussianBlur1DGPU(gpyr[0],gpyr[0],init_kernel,rows[0],cols[0],init_ksize);
+    gaussianBlur1DGPU(0,0,gpyr[0],gpyr[0],(float*)gpyr_mat[0].data,init_kernel,itm_data[0],rows[0],cols[0],init_ksize,streams[0]);
 }
 
-extern "C" void prepareForCPU(float** gpyr_d, float** dogpyr_d, std::vector<Mat>& gpyr, std::vector<Mat>& dogpyr, std::vector<int>& rows, std::vector<int>& cols){
-    for(int i = 0 ; i < nOctaves ; i++){
-        for(int j = 0 ; j < nScales ; j++){
-            int id = i*nScales + j;
-            gpyr[id] = cv::Mat(rows[i], cols[i], CV_32F);
-            float* gpyr_h = (float*) gpyr[id].data;
-            CHECK(cudaMemcpy(gpyr_h,gpyr_d[id], rows[i] * cols[i] * sizeof(float),cudaMemcpyDeviceToHost));
-        }
-        for(int j = 0 ; j < (nScales - 1) ; j++){
-            int id = i*(nScales-1) + j;
-            dogpyr[id] = cv::Mat(rows[i], cols[i], CV_32F);
-            float* dogpyr_h = (float*) dogpyr[id].data;
-            CHECK(cudaMemcpy(dogpyr_h,dogpyr_d[id], rows[i] * cols[i] * sizeof(float),cudaMemcpyDeviceToHost));
-        }
-    }
+extern "C" void prepareForCPU(float** gpyr_d, float** dogpyr_d, std::vector<Mat>& gpyr, std::vector<Mat>& dogpyr, float** itm_data, std::vector<int>& rows, std::vector<int>& cols, std::vector<cudaStream_t>& streams){
+    CHECK(cudaDeviceSynchronize());
 }
 
-extern "C" void buildGaussianPyramidGPU(int octave_idx, Mat image, float** filter, float** gpyr, std::vector<int>& rows, std::vector<int>& cols, std::vector<int>& filter_sizes){
+extern "C" void buildGaussianPyramidGPU(int octave_idx, Mat image, float** filter, float** gpyr, std::vector<Mat>& gpyr_mat , float** itm_data, std::vector<int>& rows, std::vector<int>& cols, std::vector<int>& filter_sizes, std::vector<cudaStream_t>& streams){
     for(int j = 0 ; j < nScales ; j++ ){
         if(octave_idx == 0 && j == 0){
         }else if(j == 0){
-            halfImageGPU(gpyr[(octave_idx-1)*nScales + nOctaveLayers],gpyr[octave_idx*nScales],rows[octave_idx-1],cols[octave_idx-1]);
+            halfImageGPU(gpyr[(octave_idx-1)*nScales + nOctaveLayers],gpyr[octave_idx*nScales],(float*)gpyr_mat[octave_idx*nScales+j].data,rows[octave_idx-1],cols[octave_idx-1],streams[j]);
         }else{
-            gaussianBlur1DGPU(gpyr[octave_idx*nScales],gpyr[octave_idx*nScales+j],filter[j],rows[octave_idx],cols[octave_idx],filter_sizes[j]);
+            gaussianBlur1DGPU(octave_idx,j,gpyr[octave_idx*nScales],gpyr[octave_idx*nScales+j],(float*)gpyr_mat[octave_idx*nScales+j].data,filter[j],itm_data[j],rows[octave_idx],cols[octave_idx],filter_sizes[j],streams[j]);
         }
     }
 }
-extern "C" void buildDoGPyramidGPU(int octave_idx, float** gpyr, float** dogpyr, std::vector<int>& rows, std::vector<int>& cols){
+extern "C" void buildDoGPyramidGPU(int octave_idx, float** gpyr, float** dogpyr, std::vector<Mat>& dogpyr_mat, std::vector<int>& rows, std::vector<int>& cols, std::vector<cudaStream_t>& streams){
     for(int j = 0 ; j < nScales - 1 ; j++ ){
-        differentiateGPU(gpyr[octave_idx*nScales+j],gpyr[octave_idx*nScales+j+1],dogpyr[octave_idx*(nScales - 1) + j], rows[octave_idx], cols[octave_idx]);
+        differentiateGPU(gpyr[octave_idx*nScales+j],gpyr[octave_idx*nScales+j+1],dogpyr[octave_idx*(nScales - 1) + j],(float*)dogpyr_mat[octave_idx*(nScales-1)+j].data, rows[octave_idx], cols[octave_idx],streams[j]);
     }
 }

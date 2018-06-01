@@ -2,7 +2,7 @@
 #include "sift_cuda.hpp"
 
 using namespace cv;
-using namespace cv::xfeatures2d;
+//using namespace cv::xfeatures2d;
 
 void readme();
 void readImage(Mat&, Mat&, char*, bool);

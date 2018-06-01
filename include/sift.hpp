@@ -13,9 +13,8 @@
 #include <cuda.h>
 #include <opencv2/imgcodecs.hpp>
 #include <opencv2/imgproc.hpp>
-#include <opencv2/xfeatures2d.hpp>
 #include <opencv2/core.hpp>
-#include <opencv2/xfeatures2d.hpp>
+//#include <opencv2/xfeatures2d.hpp>
 #include <opencv2/highgui.hpp>
 #include <opencv2/core/utility.hpp>
 #include <opencv2/core/hal/hal.hpp>
@@ -26,7 +25,7 @@
 #include <omp.h>
 
 using namespace cv;
-using namespace cv::xfeatures2d;
+//using namespace cv::xfeatures2d;
 
 typedef float data_t; // data type using in filter
 
