@@ -30,7 +30,7 @@ INCLUDES = -I include/ -I /usr/local/include -I /usr/local/cuda-9.1/include/
 LIBS = -lopencv_imgproc -lopencv_xfeatures2d -lopencv_core -lopencv_highgui -lopencv_calib3d -lopencv_flann -gomp -fopenmp
 EXTRA_LIBS = -Xlinker /usr/local/lib/libopencv_imgcodecs.so.4.0 -Xlinker /usr/local/lib/libopencv_features2d.so.4.0
 
-NVCC_FLAGS = -lopencv_imgproc -lopencv_imgcodecs -lopencv_calib3d -lopencv_xfeatures2d -lopencv_core -lopencv_highgui -Xlinker /usr/local/lib/libopencv_imgcodecs.so.4.0 -Xlinker /usr/local/lib/libopencv_features2d.so.4.0 --compiler-options="-Wall -O3 -MP -MMD -fopenmp"
+NVCC_FLAGS = -lopencv_imgproc -lopencv_imgcodecs -lopencv_calib3d -lopencv_core -lopencv_highgui -Xlinker /usr/local/lib/libopencv_imgcodecs.so.3.2 -Xlinker /usr/local/lib/libopencv_features2d.so.3.2 --compiler-options="-Wall -O3 -MP -MMD -fopenmp"
 
 .PHONY: default_target
 default_target: release

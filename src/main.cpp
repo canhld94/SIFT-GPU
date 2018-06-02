@@ -42,7 +42,7 @@ int main( int argc, char** argv )
         const DMatch &m1 = matches[i][0];
         const DMatch &m2 = matches[i][1];
             
-        if(m1.distance <= 0.95* m2.distance)        
+        if(m1.distance <= 0.85* m2.distance)        
         good_matches.push_back(m1);     
   }
     Mat img_matches;
@@ -73,8 +73,8 @@ int main( int argc, char** argv )
   line( img_matches, scene_corners[1] + Point2f( img1.cols, 0), scene_corners[2] + Point2f( img1.cols, 0), Scalar( 0, 255, 0), 4 );
   line( img_matches, scene_corners[2] + Point2f( img1.cols, 0), scene_corners[3] + Point2f( img1.cols, 0), Scalar( 0, 255, 0), 4 );
   line( img_matches, scene_corners[3] + Point2f( img1.cols, 0), scene_corners[0] + Point2f( img1.cols, 0), Scalar( 0, 255, 0), 4 );
-    imshow("Keypoints", img_matches);
-    waitKey(0);
+  imshow("Keypoints", img_matches);
+  waitKey(0);
     return 0;
 }
 
@@ -87,7 +87,7 @@ int main( int argc, char** argv )
     img = imread(filename);
     if(!img.data)
       { std::cout<< " --(!) Error reading images " << std::endl; exit(0); }
-    if(resized) resize(img, img, Size(800,800));
+    if(resized) resize(img, img, Size(960,960));
     cvtColor(img, gray, cv::COLOR_RGB2GRAY);
     gray.convertTo(gray, CV_32F);
     return;

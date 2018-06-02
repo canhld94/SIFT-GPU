@@ -251,21 +251,22 @@ extern "C" void prepareForGPU(Mat img_mat, float** filter, float** gpyr, float**
         }
     }
 	for(int i = 0; i < nScales; i++){
-        cudaStreamCreate(&(streams[i]));
-        if(i == 0){
-            sig[i] = Sigma;
-        }else{
-            double sig_total = pow(k* 1.0, (double) i)*Sigma;
-            sig[i] = (float) sqrt(sig_total*sig_total - Sigma*Sigma);
-        }
+        	if(i == 0){
+           		 sig[i] = Sigma;
+       		 } else{
+            		double sig_total = pow(k* 1.0, (double) i)*Sigma;
+           		sig[i] = (float) sqrt(sig_total*sig_total - Sigma*Sigma);
+       		 }
 
-        int w = floor(3 * sig[i]);
-        int size = 2 * w + 1;
-        filter_sizes[i] = size;
-
-        CHECK(cudaMalloc((float**)&itm_data[i],rows[0]*cols[0]*sizeof(float)));
-        CHECK(cudaMalloc((float**)&filter[i], size * sizeof(float)));
-        getGaussianKernel1DGPU(sig[i],filter[i],w);
+        	int w = floor(3 * sig[i]);
+        	int size = 2 * w + 1;
+       		filter_sizes[i] = size;
+       		cudaStreamCreate(&(streams[i]));
+                CHECK(cudaMalloc((float**)&itm_data[i],rows[0]*cols[0]*sizeof(float)));
+      		CHECK(cudaMalloc((float**)&filter[i], size * sizeof(float)));
+	}
+	for(int i = 0; i < nScales; i++){
+		getGaussianKernel1DGPU(sig[i],filter[i],filter_sizes[i]/2);
 	}
     CHECK(cudaMemcpy(gpyr[0],img_arr,rows[0] * cols[0] * sizeof(float),cudaMemcpyHostToDevice));
     
