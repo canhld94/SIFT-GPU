@@ -27,6 +27,8 @@
 using namespace cv;
 //using namespace cv::xfeatures2d;
 
+#define NTHREADS 4
+
 typedef float data_t; // data type using in filter
 
 /* Parameter to implement SIFT*/

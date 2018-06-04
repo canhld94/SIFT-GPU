@@ -137,7 +137,7 @@ void Gaussian_Blur_1D(Mat& src,
 	float *kernel_data = (float *) gKernel.data;
 	data_t *itm_data = (data_t *) itm.data;
 	data_t *output = (data_t *) dst.data;
-	#pragma omp parallel num_threads(16) if(rows > 16) private(tid, nthreads, i, j)
+	#pragma omp parallel num_threads(NTHREADS) if(rows > NTHREADS) private(tid, nthreads, i, j)
 	{
 	tid = omp_get_thread_num();
 	nthreads = omp_get_num_threads();
@@ -566,6 +566,7 @@ void findScaleSpaceExtrema(std::vector<Mat>& gpyr,
 	// const float threshold = 0.5 * contrastThreshold / nOctaveLayers;
     keypoints.clear();
     TLSData<std::vector<KeyPoint> > tls_kpts_struct;
+	#pragma opm parallel for num_threads(NTHREADS) collapse(2)
     for( int o = 0; o < nOctaves; o++ )
         for( int i = 1; i <= nOctaveLayers; i++ )
         {
@@ -574,7 +575,7 @@ void findScaleSpaceExtrema(std::vector<Mat>& gpyr,
             const int step = (int)img.step1();
             const int rows = img.rows, cols = img.cols;
 			findScaleSpaceExtremaComputer(
-                    o, i, 8, idx, step,
+                    o, i, 9, idx, step,
                     nOctaveLayers,
                     contrastThreshold,
                     edgeThreshold,
@@ -900,7 +901,7 @@ void calDescriptor( std::vector<Mat>& gpyr,
 					Mat& descriptors,
 					int firstOctave){
 	static const int d = SIFT_DESCR_WIDTH, n = SIFT_DESCR_HIST_BINS;
-    #pragma omp parallel for
+    #pragma omp parallel for num_threads(NTHREADS)
 	for(int i = 0; i < keypoints.size(); ++i){
 		KeyPoint kpt = keypoints[i];
 		int octave, layer;
