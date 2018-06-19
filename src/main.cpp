@@ -35,7 +35,7 @@ int main( int argc, char** argv )
         const DMatch &m1 = matches[i][0];
         const DMatch &m2 = matches[i][1];
             
-        if(m1.distance <= 0.85*m2.distance)        
+        if(m1.distance <= 0.86*m2.distance)        
         good_matches.push_back(m1);     
   }
     Mat img_matches;
@@ -80,7 +80,7 @@ int main( int argc, char** argv )
     img = imread(filename);
     if(!img.data)
       { std::cout<< " --(!) Error reading images " << std::endl; exit(0); }
-    if(resized) resize(img, img, Size(800,800));
+    if(resized) resize(img, img, Size(960,960));
     cvtColor(img, gray, cv::COLOR_RGB2GRAY);
     gray.convertTo(gray, CV_32F);
     return;

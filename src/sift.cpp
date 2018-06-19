@@ -267,6 +267,7 @@ void buildDoGPyramid(std::vector<Mat>& gpyr,
 					 int nOctaves){
 	dogpyr.resize(nOctaves*(nScales-1));
 	int i, o;
+    // #pragma omp parallel for private (o,i) collapse(2)
 	for (o = 0; o < nOctaves; ++o) {
 		for (i = 0; i < nScales - 1; ++i) {
 			Mat& src0 = gpyr[o*nScales + i];
@@ -551,6 +552,7 @@ void findScaleSpaceExtrema(std::vector<Mat>& gpyr,
 	// const float threshold = 0.5 * contrastThreshold / nOctaveLayers;
     keypoints.clear();
     TLSData<std::vector<KeyPoint> > tls_kpts_struct;
+    // #pragma omp parallel for collapse(2)
     for( int o = 0; o < nOctaves; o++ )
         for( int i = 1; i <= nOctaveLayers; i++ )
         {
@@ -559,7 +561,7 @@ void findScaleSpaceExtrema(std::vector<Mat>& gpyr,
             const int step = (int)img.step1();
             const int rows = img.rows, cols = img.cols;
 			findScaleSpaceExtremaComputer(
-                    o, i, 4, idx, step,
+                    o, i, 7, idx, step,
                     nOctaveLayers,
                     contrastThreshold,
                     edgeThreshold,
