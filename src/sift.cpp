@@ -93,25 +93,26 @@ void SIFT_NCL(InputArray image,
 /* Gaussian Blur Function use 2D convolution */
 
 static Mat getGaussianKernel(float sigma){
-	float *coeff; // coeff array, row major
+	data_t *coeff; // coeff array, row major
 	int w = floor(3*sigma);
 	int size = 2*w + 1;
-	Mat gKernel(size, size, CV_32F);
-	coeff = (float *) gKernel.data;
+	Mat gKernel(size, size, DATATYPE);
+	coeff = (data_t *) gKernel.data;
 	for (int i = -w; i <= w; ++i)
 		for(int j = -w; j <= w; ++j){
 			double dat = 1./(2*PI*sigma*sigma) * exp(-(i*i + j*j)*1./(2*sigma*sigma));
-			coeff[(i+w)*size + (j+w)] = (float) dat;
+            dat = dat*8192;
+			coeff[(i+w)*size + (j+w)] = (data_t) dat;
 		}
 	return gKernel;
 }
 
-static void getSubMatrix(int r, int c, Mat src, int ksize, float *data){
-	float *imag = (float *) src.data;
+static void getSubMatrix(int r, int c, Mat src, int ksize, data_t *data){
+	data_t *imag = (data_t *) src.data;
 	int w = floor(ksize/2);
 	for (int i = -w; i <= w; ++i)
 		for(int j = -w; j <= w; ++j){
-			float ele;
+			data_t ele;
 			if(r+i < 0 || c+j < 0 || r+i >= src.rows-1 || c+j >= src.cols-1) ele = 0;
 			else ele = imag[(r+i)*src.cols + c+j];
 			data[(i+w)*ksize + (j+w)] = ele;
@@ -127,12 +128,12 @@ void Gaussian_Blur(Mat& src,
 	Mat gKernel = getGaussianKernel(sigma);
 	int rows = src.rows;
 	int cols = src.cols;
-	dst = Mat(rows, cols, CV_32F);
+	dst = Mat(rows, cols, DATATYPE);
 	int ksize = gKernel.rows;
 	// pad input image with 0
-	float *image_data = new float[ksize*ksize];
-	float *kernel_data = (float *) gKernel.data;
-	float *output = (float *) dst.data;
+	data_t *image_data = new data_t[ksize*ksize];
+	data_t *kernel_data = (data_t *) gKernel.data;
+	data_t *output = (data_t *) dst.data;
 	for (int i = 0; i < src.rows; ++i) {
 		for (int j = 0; j < src.cols; ++j) {
 			// fill image data
@@ -142,8 +143,7 @@ void Gaussian_Blur(Mat& src,
 			for(int k = 0; k < ksize*ksize; ++k){
 				dotprod += image_data[k] * kernel_data[k];
 			}
-			output[i*dst.cols + j] = dotprod;
-			if(dotprod > 255 ) printf("error in dot prdo %d %d\n", i, j);
+			output[i*dst.cols + j] = dotprod/8192;
 		}
 
 	}
@@ -220,8 +220,8 @@ static Mat createInitialImage(Mat& image,
 							  bool doubleSize,
 					   		  double sigma){
 	Mat base;
-	Gaussian_Blur_1D(image, base, sigma);
-	// GaussianBlur(image, base, Size(), sigma, sigma);
+	// Gaussian_Blur_1D(image, base, sigma);
+	Gaussian_Blur(image, base, sigma);
 
 	return base;
 }
@@ -255,7 +255,7 @@ void buildGaussianPyramid(Mat& image,
 			}
 			else{
 				Mat& src = gpyr[o*nScales]; // Base of current octave
-				Gaussian_Blur_1D(src, dst, sig[i]);
+				Gaussian_Blur(src, dst, sig[i]);
 				// GaussianBlur(src, dst, Size(), sig[i], sig[i]);
 			}
 	}
@@ -304,20 +304,20 @@ static bool adjustLocalExtrema( const std::vector<Mat>& dogpyr, KeyPoint& kpt, i
         const Mat& prev = dogpyr[idx-1];
         const Mat& next = dogpyr[idx+1];
 
-        Vec3f dD((img.at<float>(r, c+1) - img.at<float>(r, c-1))*deriv_scale,
-                 (img.at<float>(r+1, c) - img.at<float>(r-1, c))*deriv_scale,
-                 (next.at<float>(r, c) - prev.at<float>(r, c))*deriv_scale);
+        Vec3f dD((img.at<data_t>(r, c+1) - img.at<data_t>(r, c-1))*deriv_scale,
+                 (img.at<data_t>(r+1, c) - img.at<data_t>(r-1, c))*deriv_scale,
+                 (next.at<data_t>(r, c) - prev.at<data_t>(r, c))*deriv_scale);
 
-        float v2 = (float)img.at<float>(r, c)*2;
-        float dxx = (img.at<float>(r, c+1) + img.at<float>(r, c-1) - v2)*second_deriv_scale;
-        float dyy = (img.at<float>(r+1, c) + img.at<float>(r-1, c) - v2)*second_deriv_scale;
-        float dss = (next.at<float>(r, c) + prev.at<float>(r, c) - v2)*second_deriv_scale;
-        float dxy = (img.at<float>(r+1, c+1) - img.at<float>(r+1, c-1) -
-                     img.at<float>(r-1, c+1) + img.at<float>(r-1, c-1))*cross_deriv_scale;
-        float dxs = (next.at<float>(r, c+1) - next.at<float>(r, c-1) -
-                     prev.at<float>(r, c+1) + prev.at<float>(r, c-1))*cross_deriv_scale;
-        float dys = (next.at<float>(r+1, c) - next.at<float>(r-1, c) -
-                     prev.at<float>(r+1, c) + prev.at<float>(r-1, c))*cross_deriv_scale;
+        float v2 = (float)img.at<data_t>(r, c)*2;
+        float dxx = (img.at<data_t>(r, c+1) + img.at<data_t>(r, c-1) - v2)*second_deriv_scale;
+        float dyy = (img.at<data_t>(r+1, c) + img.at<data_t>(r-1, c) - v2)*second_deriv_scale;
+        float dss = (next.at<data_t>(r, c) + prev.at<data_t>(r, c) - v2)*second_deriv_scale;
+        float dxy = (img.at<data_t>(r+1, c+1) - img.at<data_t>(r+1, c-1) -
+                     img.at<data_t>(r-1, c+1) + img.at<data_t>(r-1, c-1))*cross_deriv_scale;
+        float dxs = (next.at<data_t>(r, c+1) - next.at<data_t>(r, c-1) -
+                     prev.at<data_t>(r, c+1) + prev.at<data_t>(r, c-1))*cross_deriv_scale;
+        float dys = (next.at<data_t>(r+1, c) - next.at<data_t>(r-1, c) -
+                     prev.at<data_t>(r+1, c) + prev.at<data_t>(r-1, c))*cross_deriv_scale;
 
         Matx33f H(dxx, dxy, dxs,
                   dxy, dyy, dys,
@@ -356,21 +356,21 @@ static bool adjustLocalExtrema( const std::vector<Mat>& dogpyr, KeyPoint& kpt, i
         const Mat& img = dogpyr[idx];
         const Mat& prev = dogpyr[idx-1];
         const Mat& next = dogpyr[idx+1];
-        Matx31f dD((img.at<float>(r, c+1) - img.at<float>(r, c-1))*deriv_scale,
-                   (img.at<float>(r+1, c) - img.at<float>(r-1, c))*deriv_scale,
-                   (next.at<float>(r, c) - prev.at<float>(r, c))*deriv_scale);
+        Matx31f dD((img.at<data_t>(r, c+1) - img.at<data_t>(r, c-1))*deriv_scale,
+                   (img.at<data_t>(r+1, c) - img.at<data_t>(r-1, c))*deriv_scale,
+                   (next.at<data_t>(r, c) - prev.at<data_t>(r, c))*deriv_scale);
         float t = dD.dot(Matx31f(xc, xr, xi));
 
-        contr = img.at<float>(r, c)*img_scale + t * 0.5f;
+        contr = img.at<data_t>(r, c)*img_scale + t * 0.5f;
         if( std::abs( contr ) * nOctaveLayers < contrastThreshold )
             return false;
 
         // principal curvatures are computed using the trace and det of Hessian
-        float v2 = img.at<float>(r, c)*2.f;
-        float dxx = (img.at<float>(r, c+1) + img.at<float>(r, c-1) - v2)*second_deriv_scale;
-        float dyy = (img.at<float>(r+1, c) + img.at<float>(r-1, c) - v2)*second_deriv_scale;
-        float dxy = (img.at<float>(r+1, c+1) - img.at<float>(r+1, c-1) -
-                     img.at<float>(r-1, c+1) + img.at<float>(r-1, c-1)) * cross_deriv_scale;
+        float v2 = img.at<data_t>(r, c)*2.f;
+        float dxx = (img.at<data_t>(r, c+1) + img.at<data_t>(r, c-1) - v2)*second_deriv_scale;
+        float dyy = (img.at<data_t>(r+1, c) + img.at<data_t>(r-1, c) - v2)*second_deriv_scale;
+        float dxy = (img.at<data_t>(r+1, c+1) - img.at<data_t>(r+1, c-1) -
+                     img.at<data_t>(r-1, c+1) + img.at<data_t>(r-1, c-1)) * cross_deriv_scale;
         float tr = dxx + dyy;
         float det = dxx * dyy - dxy * dxy;
 
@@ -410,8 +410,8 @@ static float calcOrientationHist( const Mat& img, Point pt, int radius,
             if( x <= 0 || x >= img.cols - 1 )
                 continue;
 
-            float dx = (float)(img.at<float>(y, x+1) - img.at<float>(y, x-1));
-            float dy = (float)(img.at<float>(y-1, x) - img.at<float>(y+1, x));
+            float dx = (float)(img.at<data_t>(y, x+1) - img.at<data_t>(y, x-1));
+            float dy = (float)(img.at<data_t>(y-1, x) - img.at<data_t>(y+1, x));
 
             X[k] = dx; Y[k] = dy; W[k] = (i*i + j*j)*expf_scale;
             k++;
@@ -485,11 +485,11 @@ static void findScaleSpaceExtremaComputer(int o, // octave index
 
 	KeyPoint kpt;
 	for(int r = SIFT_IMG_BORDER; r < rows - SIFT_IMG_BORDER; ++r){
-		const float *currptr = img.ptr<float>(r);
-		const float *prevptr = prev.ptr<float>(r);
-		const float *nextptr = next.ptr<float>(r);
+        const data_t* currptr = img.ptr<data_t>(r);
+        const data_t* prevptr = prev.ptr<data_t>(r);
+        const data_t* nextptr = next.ptr<data_t>(r);
 		for(int c = SIFT_IMG_BORDER; c < cols - SIFT_IMG_BORDER; ++c){
-			float val = currptr[c];
+			data_t val = currptr[c];
 			if( std::abs(val) > threshold &&
 			((val > 0 && val >= currptr[c-1] && val >= currptr[c+1] &&
 			val >= currptr[c-step-1] && val >= currptr[c-step] && val >= currptr[c-step+1] &&
@@ -561,7 +561,7 @@ void findScaleSpaceExtrema(std::vector<Mat>& gpyr,
             const int step = (int)img.step1();
             const int rows = img.rows, cols = img.cols;
 			findScaleSpaceExtremaComputer(
-                    o, i, 7, idx, step,
+                    o, i, 8, idx, step,
                     nOctaveLayers,
                     contrastThreshold,
                     edgeThreshold,
@@ -620,8 +620,8 @@ static void calcSIFTDescriptor( const Mat& img, Point2f ptf, float ori, float sc
             if( rbin > -1 && rbin < d && cbin > -1 && cbin < d &&
                 r > 0 && r < rows - 1 && c > 0 && c < cols - 1 )
             {
-                float dx = (float)(img.at<float>(r, c+1) - img.at<float>(r, c-1));
-                float dy = (float)(img.at<float>(r-1, c) - img.at<float>(r+1, c));
+                float dx = (float)(img.at<data_t>(r, c+1) - img.at<data_t>(r, c-1));
+                float dy = (float)(img.at<data_t>(r-1, c) - img.at<data_t>(r+1, c));
                 X[k] = dx; Y[k] = dy; RBin[k] = rbin; CBin[k] = cbin;
                 W[k] = (c_rot * c_rot + r_rot * r_rot)*exp_scale;
                 k++;

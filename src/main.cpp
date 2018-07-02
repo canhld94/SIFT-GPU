@@ -82,6 +82,6 @@ int main( int argc, char** argv )
       { std::cout<< " --(!) Error reading images " << std::endl; exit(0); }
     if(resized) resize(img, img, Size(960,960));
     cvtColor(img, gray, cv::COLOR_RGB2GRAY);
-    gray.convertTo(gray, CV_32F);
+    gray.convertTo(gray, DATATYPE);
     return;
   }

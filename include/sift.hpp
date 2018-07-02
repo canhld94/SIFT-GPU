@@ -30,6 +30,8 @@ using namespace cv::xfeatures2d;
 
 typedef float data_t; // data type using in filter
 
+#define DATATYPE CV_32FC1
+
  /*SIFT build-in opencv function*/
 void SITF_BuildIn_OpenCV(InputArray image,
 						 std::vector<KeyPoint>& keypoints,
